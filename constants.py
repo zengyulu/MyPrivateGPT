@@ -4,7 +4,7 @@ import os
 from chromadb.config import Settings
 
 # https://python.langchain.com/en/latest/modules/indexes/document_loaders/examples/excel.html?highlight=xlsx#microsoft-excel
-from langchain.document_loaders import CSVLoader, PDFMinerLoader, TextLoader, UnstructuredExcelLoader, Docx2txtLoader
+from langchain.document_loaders import CSVLoader, PDFMinerLoader, TextLoader, UnstructuredExcelLoader, Docx2txtLoader, UnstructuredPowerPointLoader
 
 # load_dotenv()
 ROOT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
@@ -33,19 +33,29 @@ DOCUMENT_MAP = {
     ".xlsx": UnstructuredExcelLoader,
     ".docx": Docx2txtLoader,
     ".doc": Docx2txtLoader,
+    ".pptx": UnstructuredPowerPointLoader,
+    ".ppt": UnstructuredPowerPointLoader,
 }
 
+# Default scanned documents csv file name
+DUMP_CSV_FILE_NAME = 'MyDocumentsIndex.csv'
+
+# Default conversation history file name
+CONVERSATION_HISTORY_FILE_NAME = "MyConversationHistory.csv"
+
 # Default Instructor Model
-EMBEDDING_MODEL_NAME = "hkunlp/instructor-large"
+#EMBEDDING_MODEL_NAME = "hkunlp/instructor-large"
 # You can also choose a smaller model, don't forget to change HuggingFaceInstructEmbeddings
 # to HuggingFaceEmbeddings in both ingest.py and run_localGPT.py
 # EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
+EMBEDDING_MODEL_NAME = "hkunlp/instructor-xl"
+
 
 # Select the Model ID and model_basename
 # load the LLM for generating Natural Language responses
 
-MODEL_ID = "TheBloke/Llama-2-7B-Chat-GGML"
-MODEL_BASENAME = "llama-2-7b-chat.ggmlv3.q4_0.bin"
+#MODEL_ID = "TheBloke/Llama-2-7B-Chat-GGML"
+#MODEL_BASENAME = "llama-2-7b-chat.ggmlv3.q4_0.bin"
 
 # for HF models
 # MODEL_ID = "TheBloke/vicuna-7B-1.1-HF"
@@ -64,8 +74,8 @@ MODEL_BASENAME = "llama-2-7b-chat.ggmlv3.q4_0.bin"
 # ~21GB VRAM. Using STransformers alongside can potentially create OOM on 24GB cards.
 # MODEL_ID = "TheBloke/wizardLM-7B-GPTQ"
 # MODEL_BASENAME = "wizardLM-7B-GPTQ-4bit.compat.no-act-order.safetensors"
-# MODEL_ID = "TheBloke/WizardLM-7B-uncensored-GPTQ"
-# MODEL_BASENAME = "WizardLM-7B-uncensored-GPTQ-4bit-128g.compat.no-act-order.safetensors"
+#MODEL_ID = "TheBloke/WizardLM-7B-uncensored-GPTQ"
+#MODEL_BASENAME = "WizardLM-7B-uncensored-GPTQ-4bit-128g.compat.no-act-order.safetensors"
 
 # for GGML (quantized cpu+gpu+mps) models - check if they support llama.cpp
 # MODEL_ID = "TheBloke/wizard-vicuna-13B-GGML"
@@ -75,4 +85,20 @@ MODEL_BASENAME = "llama-2-7b-chat.ggmlv3.q4_0.bin"
 # MODEL_ID = "TheBloke/orca_mini_3B-GGML"
 # MODEL_BASENAME = "orca-mini-3b.ggmlv3.q4_0.bin"
 
+#MODEL_ID = "TheBloke/WizardLM-30B-Uncensored-GPTQ"
+#MODEL_BASENAME = "WizardLM-30B-Uncensored-GPTQ-4bit--1g.act.order.safetensors"
 
+#MODEL_ID = "TheBloke/falcon-40b-instruct-GPTQ"
+#MODEL_BASENAME = "gptq_model-4bit--1g.safetensors"
+
+MODEL_ID = "TheBloke/Llama-2-13B-chat-GPTQ"
+MODEL_BASENAME = "gptq_model-4bit-128g.safetensors"
+
+#MODEL_ID = "TheBloke/Wizard-Vicuna-30B-Uncensored-GPTQ"
+#MODEL_BASENAME = "Wizard-Vicuna-30B-Uncensored-GPTQ-4bit--1g.act.order.safetensors"
+
+#MODEL_ID = "TheBloke/stable-vicuna-13B-GPTQ"
+#MODEL_BASENAME = "stable-vicuna-13B-GPTQ-4bit.compat.no-act-order.safetensors"
+
+#MODEL_ID = "baichuan-inc/Baichuan-13B-Chat"
+#MODEL_BASENAME = None

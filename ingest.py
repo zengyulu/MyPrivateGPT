@@ -1,11 +1,16 @@
+import ast
 import logging
 import os
+import datetime
+import hashlib
+import csv
+
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 
 import click
 import torch
 from langchain.docstore.document import Document
-from langchain.embeddings import HuggingFaceInstructEmbeddings
+from langchain.embeddings import HuggingFaceInstructEmbeddings, HuggingFaceEmbeddings
 from langchain.text_splitter import Language, RecursiveCharacterTextSplitter
 from langchain.vectorstores import Chroma
 
@@ -16,8 +21,50 @@ from constants import (
     INGEST_THREADS,
     PERSIST_DIRECTORY,
     SOURCE_DIRECTORY,
+    DUMP_CSV_FILE_NAME,
 )
 
+# store scanned files
+records = {}
+
+def add_document_record(originalPath, fileName):
+    if(os.path.isdir(os.path.join(originalPath,fileName))):
+        return
+    
+    hashcode = generate_record_id(os.path.join(originalPath,fileName))
+    if hashcode in records :
+        print(f"ID {hashcode} already exists and file has been scanned.")
+    else:
+        records[hashcode] = {
+            "original_path": originalPath,
+            "file_name": fileName,
+            "timestamp": datetime.datetime.now().strftime("%Y%m%d%H%M%S"),
+            "scanned": False,
+        }
+        #print(f"New record {hashcode} added successfully.")
+
+BUF_SIZE = 8192  # lets read stuff in 64kb chunks!
+
+def generate_record_id(filePath):
+    try:
+        hasher = hashlib.new('sha256')
+        with open(filePath, 'rb') as file:
+            while chunk := file.read(BUF_SIZE):
+                if not chunk:
+                    break
+                hasher.update(chunk)
+        return hasher.hexdigest()
+    except FileNotFoundError:
+       print(f"Error: File '{filePath}' not found.")
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
+
+# file must not be 0 byte
+# file must be with the valid file type
+# file must be unique in the whole dictionary
+def is_existing_record(filePath):
+    return get_record(filePath) != None
 
 def load_single_document(file_path: str) -> Document:
     # Loads a single document from a file path
@@ -42,35 +89,68 @@ def load_document_batch(filepaths):
         return (data_list, filepaths)
 
 
+scan_files = []
+def load_documents_recursive(source_dir: str, all_files: list[str]):
+    for file_name in all_files:
+        source_file_path = os.path.join(source_dir,file_name)
+        # check if the path is a directory, then recursively dive into the sub directory first
+        if os.path.isdir(source_file_path):
+            all_files = os.listdir(source_file_path)
+            load_documents_recursive(source_file_path,all_files)
+        # ignore any file starting with ., they are not valid for processing
+        if not file_name.startswith('.'):
+            file_extension = os.path.splitext(file_name)[1]
+            
+            # only if file extension is supported and file size is not equal to zero
+            # and only if record doesn't exist or an existing record has not yet been scanned
+            isZeroByte = os.path.getsize(source_file_path) == 0
+            if file_extension in DOCUMENT_MAP.keys() and not isZeroByte:
+                isExistingRecord = is_existing_record(source_file_path)
+                
+                if not isExistingRecord \
+                    or isExistingRecord and not get_record(source_file_path)['scanned']:
+                        # add the file for scanning
+                        scan_files.append(source_file_path)
+                        if not isExistingRecord:
+                            add_document_record(source_dir, file_name)
+
+def get_record(source_file_path):
+    return records.get(generate_record_id(source_file_path))
+
+
 def load_documents(source_dir: str) -> list[Document]:
     # Loads all documents from the source documents directory
     all_files = os.listdir(source_dir)
-    paths = []
-    for file_path in all_files:
-        file_extension = os.path.splitext(file_path)[1]
-        source_file_path = os.path.join(source_dir, file_path)
-        if file_extension in DOCUMENT_MAP.keys():
-            paths.append(source_file_path)
-
+    load_documents_recursive(source_dir, all_files)
+    
+    numberOfFiles = len(scan_files)
     # Have at least one worker and at most INGEST_THREADS workers
-    n_workers = min(INGEST_THREADS, max(len(paths), 1))
-    chunksize = round(len(paths) / n_workers)
+    n_workers = min(INGEST_THREADS, max(numberOfFiles, 1))
+    chunksize = 2 # round(numberOfFiles / n_workers)
     docs = []
     with ProcessPoolExecutor(n_workers) as executor:
         futures = []
         # split the load operations into chunks
-        for i in range(0, len(paths), chunksize):
+        
+        for i in range(0, numberOfFiles, chunksize):
             # select a chunk of filenames
-            filepaths = paths[i : (i + chunksize)]
+            filepaths = scan_files[i : (i + chunksize)]
             # submit the task
             future = executor.submit(load_document_batch, filepaths)
             futures.append(future)
         # process all results
         for future in as_completed(futures):
             # open the file and load the data
-            contents, _ = future.result()
-            docs.extend(contents)
-
+            try:
+                contents, _ = future.result()
+                docs.extend(contents)
+                for content in contents:
+                    docPath = content.metadata['source']
+                    if(is_existing_record(docPath)):
+                        records.get(generate_record_id(docPath))['scanned'] = True
+            except Exception as ex:
+                print(str(ex))
+                continue
     return docs
 
 
@@ -117,17 +197,24 @@ def split_documents(documents: list[Document]) -> tuple[list[Document], list[Doc
     help="Device to run on. (Default is cuda)",
 )
 def main(device_type):
+    open_dump_csv()
     # Load documents and split in chunks
     logging.info(f"Loading documents from {SOURCE_DIRECTORY}")
     documents = load_documents(SOURCE_DIRECTORY)
+    
+    if len(documents) == 0:
+        print("No more documents have been identifed for scanning. Exit now ...")
+        return
     text_documents, python_documents = split_documents(documents)
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     python_splitter = RecursiveCharacterTextSplitter.from_language(
-        language=Language.PYTHON, chunk_size=880, chunk_overlap=200
+        language=Language.PYTHON,
+        chunk_size=1000,
+        chunk_overlap=200
     )
     texts = text_splitter.split_documents(text_documents)
     texts.extend(python_splitter.split_documents(python_documents))
-    logging.info(f"Loaded {len(documents)} documents from {SOURCE_DIRECTORY}")
+    logging.info(f"Loaded {len(documents)} documents from {SOURCE_DIRECTORY} for scanning")
     logging.info(f"Split into {len(texts)} chunks of text")
 
     # Create embeddings
@@ -140,7 +227,7 @@ def main(device_type):
     # If you use HuggingFaceEmbeddings, make sure to also use the same in the
     # run_localGPT.py file.
 
-    # embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL_NAME)
+    #embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL_NAME)
 
     db = Chroma.from_documents(
         texts,
@@ -151,9 +238,43 @@ def main(device_type):
     db.persist()
     db = None
 
+    save_dump_csv(records)
+
+
+def open_dump_csv():
+    if(os.path.exists(DUMP_CSV_FILE_NAME)):
+        try:
+            with open(DUMP_CSV_FILE_NAME,'r') as dumpFile:
+                oldRecords = csv.DictReader(dumpFile, fieldnames=('hashcode','tuple'))
+                num = 0
+                for row in oldRecords:
+                    currentRecord = ast.literal_eval(row['tuple'])
+                    records[row['hashcode']] = {
+                        "original_path": currentRecord['original_path'],
+                        "file_name": currentRecord['file_name'],
+                        "timestamp": currentRecord['timestamp'],
+                        "scanned": currentRecord['scanned'],
+                       # "processed": currentRecord['processed']
+                    }
+                    num=num+1
+                print(f"{num} records loaded from scanning csv file")    
+        except Exception as ex:
+            print(str(ex))          
+
+def save_dump_csv(records):
+    if os.path.exists(DUMP_CSV_FILE_NAME):
+        try:
+            os.remove(DUMP_CSV_FILE_NAME)
+        except Exception as ex:
+            print(str(ex))
+            
+    with open(DUMP_CSV_FILE_NAME,'a+') as dumpFile:
+        writer = csv.writer(dumpFile)
+        writer.writerows(records.items())
 
 if __name__ == "__main__":
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(filename)s:%(lineno)s - %(message)s", level=logging.INFO
     )
     main()
+    

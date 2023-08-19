@@ -1,4 +1,8 @@
+import ast
+import csv
 import logging
+import os
+import datetime
 
 import click
 import torch
@@ -21,7 +25,9 @@ from transformers import (
     pipeline,
 )
 
-from constants import CHROMA_SETTINGS, EMBEDDING_MODEL_NAME, PERSIST_DIRECTORY, MODEL_ID, MODEL_BASENAME
+from constants import CHROMA_SETTINGS, EMBEDDING_MODEL_NAME, PERSIST_DIRECTORY, MODEL_ID, MODEL_BASENAME, CONVERSATION_HISTORY_FILE_NAME
+
+conversations = {}
 
 
 def load_model(device_type, model_id, model_basename=None):
@@ -71,7 +77,7 @@ def load_model(device_type, model_id, model_basename=None):
                 # Remove the ".safetensors" ending if present
                 model_basename = model_basename.replace(".safetensors", "")
 
-            tokenizer = AutoTokenizer.from_pretrained(model_id, use_fast=True)
+            tokenizer = AutoTokenizer.from_pretrained(model_id, use_fast=True,trust_remote_code=True)
             logging.info("Tokenizer loaded")
 
             model = AutoGPTQForCausalLM.from_quantized(
@@ -79,6 +85,7 @@ def load_model(device_type, model_id, model_basename=None):
                 model_basename=model_basename,
                 use_safetensors=True,
                 trust_remote_code=True,
+                #device_map="auto",
                 device="cuda:0",
                 use_triton=False,
                 quantize_config=None,
@@ -88,7 +95,7 @@ def load_model(device_type, model_id, model_basename=None):
     ):  # The code supports all huggingface models that ends with -HF or which have a .bin
         # file in their HF repo.
         logging.info("Using AutoModelForCausalLM for full models")
-        tokenizer = AutoTokenizer.from_pretrained(model_id)
+        tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
         logging.info("Tokenizer loaded")
 
         model = AutoModelForCausalLM.from_pretrained(
@@ -100,6 +107,8 @@ def load_model(device_type, model_id, model_basename=None):
             # max_memory={0: "15GB"} # Uncomment this line with you encounter CUDA out of memory errors
         )
         model.tie_weights()
+        model.quantize(8)
+        model.save_pretrained("TempDir")
     else:
         logging.info("Using LlamaTokenizer")
         tokenizer = LlamaTokenizer.from_pretrained(model_id)
@@ -116,7 +125,7 @@ def load_model(device_type, model_id, model_basename=None):
         "text-generation",
         model=model,
         tokenizer=tokenizer,
-        max_length=2048,
+        max_length=4096,
         temperature=0,
         top_p=0.95,
         repetition_penalty=1.15,
@@ -177,6 +186,8 @@ def main(device_type, show_sources):
     5. Question answers.
     """
 
+    open_conversations()
+
     logging.info(f"Running on: {device_type}")
     logging.info(f"Display Source Documents set to: {show_sources}")
 
@@ -220,6 +231,9 @@ def main(device_type, show_sources):
         query = input("\nEnter a query: ")
         if query == "exit":
             break
+        
+        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        
         # Get the answer from the chain
         res = qa(query)
         answer, docs = res["result"], res["source_documents"]
@@ -234,9 +248,42 @@ def main(device_type, show_sources):
             # # Print the relevant sources used for the answer
             print("----------------------------------SOURCE DOCUMENTS---------------------------")
             for document in docs:
-                print("\n> " + document.metadata["source"] + ":")
-                print(document.page_content)
+                print("\n> " + document.metadata["source"] ) # + ":")
+                #print(document.page_content)
             print("----------------------------------SOURCE DOCUMENTS---------------------------")
+        add_conversation(timestamp, MODEL_ID,query)
+        save_conversations()
+
+def add_conversation(timestamp:str, model_id:str, query:str):
+    conversations[timestamp] = {
+            "model": model_id,
+            "query": query,
+        }
+
+def open_conversations():
+    if(os.path.exists(CONVERSATION_HISTORY_FILE_NAME)):
+        try:
+            with open(CONVERSATION_HISTORY_FILE_NAME,'r') as conversationFile:
+                oldRecords = csv.DictReader(conversationFile, fieldnames=('timestamp','tuple'))
+                num = 0
+                for row in oldRecords:
+                    currentRecord = ast.literal_eval(row['tuple'])
+                    add_conversation(row['timestamp'], currentRecord['model'], currentRecord['query'])
+                    num=num+1
+                print(f"{num} records loaded from conversation file")    
+        except Exception as ex:
+            print(str(ex))
+
+def save_conversations():
+    if os.path.exists(CONVERSATION_HISTORY_FILE_NAME):
+        try:
+            os.remove(CONVERSATION_HISTORY_FILE_NAME)
+        except Exception as ex:
+            print(str(ex))
+            
+    with open(CONVERSATION_HISTORY_FILE_NAME,'a+') as conversationFile:
+        writer = csv.writer(conversationFile)
+        writer.writerows(conversations.items())
 
 
 if __name__ == "__main__":
