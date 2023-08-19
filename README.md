@@ -1,4 +1,5 @@
-### This is forked from localGPT but edited by me to add more features and make it easy to use. Copyright remains the same and belong to original author!
+### This is forked from localGPT but edited by me to add more features and make it easy to use. Copyright remains the same and belongs to the original author!
+</a>
 
 # localGPT
 
