@@ -1,3 +1,5 @@
+## This is forked from localGPT but edited by me to add more features and make it easy to use
+
 # localGPT
 
 This project was inspired by the original [privateGPT](https://github.com/imartinez/privateGPT). Most of the description here is inspired by the original privateGPT.
