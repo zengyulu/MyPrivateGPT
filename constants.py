@@ -18,7 +18,8 @@ from langchain.document_loaders import (
 )
 
 # load_dotenv()
-ROOT_DIRECTORY = str(Path(__file__).resolve().parent.parent)#os.path.dirname(os.path.realpath(__file__))
+#ROOT_DIRECTORY = str(Path(__file__).resolve().parent.parent)
+ROOT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 
 # Define the folder for storing documents
 SOURCE_DIRECTORY_NAME = "SOURCES"
@@ -40,10 +41,8 @@ MAX_IMAGE_FILES_PER_THREAD = 4
 
 # Define the Chroma settings
 CHROMA_SETTINGS = Settings(
-    anonymized_telemetry=False,
-    is_persistent=True,
+    chroma_db_impl="duckdb+parquet", persist_directory=PERSIST_DIRECTORY, anonymized_telemetry=False
 )
-
 # https://python.langchain.com/docs/modules/data_connection/document_loaders
 
 DOCUMENT_MAP = {
