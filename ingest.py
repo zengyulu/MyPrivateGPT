@@ -6,8 +6,6 @@ import hashlib
 import csv
 
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
-import pickle
-import tempfile
 
 import click
 import torch
@@ -27,7 +25,6 @@ from constants import (
     MAX_THREADS_PER_CPU,
     PERSIST_DIRECTORY,
     FULL_PATH_TO_SOURCE_DIRECTORY,
-    ROOT_DIRECTORY,
     SCANNING_RECORD_CSV_FILE_NAME,
 )
 
@@ -36,9 +33,6 @@ import pytesseract
 pytesseract.pytesseract.tesseract_cmd = 'D:\\Tesseract-OCR\\tesseract.exe'
 
 os.environ['CURL_CA_BUNDLE'] = ''
-
-
-
 
 
 # store scanning history
@@ -121,17 +115,10 @@ def load_document_batch(files:list, number_of_files):
             # select a chunk of filenames
             file_segements = files[i : (i + files_per_batch)]
         
-            # load files
-            #futures = [executor.submit(load_single_document, name) for name in files]
-            # submit the task
-            #thread_futures.append([executor.submit(load_single_document, name) for name in file_segements])
-        
             # submit the tasks for file segements and execute them
             for result in executor.map(load_single_document, file_segements,timeout=600):
                 data_list.append(result)
-        #for future in as_completed(thread_futures):
-            # collect data
-         #   data_list.append(future.result())
+        
         # return data and file paths
         return (data_list, files)
         
@@ -155,14 +142,6 @@ def load_image_document_batch(files:list,number_of_files):
             # submit the tasks for file segements and execute them
             for result in executor.map(load_single_document, file_segements, timeout=300):
                 data_list.append(result)
-        
-            #tasks = [executor.submit(load_single_document, name) for name in file_segements]
-            
-        # collect data
-        #data_list = [future.result() for future in thread_futures]
-        #for future in as_completed(thread_futures):
-            # collect data
-         #   data_list.append(future.result())
         
         # return data and file paths
         return (data_list, files)
@@ -195,8 +174,6 @@ def execute_task(numberOfFiles, scan_file_list, func, records):
                 logging.error(f"While scanning files, following error was captured: " + str(ex))
                 continue
     return documents
-
-
 
 def search_files_recursive(source_dir: str, all_files: list[str]):
     for file_name in all_files:
@@ -385,7 +362,6 @@ def main(device_type):
 
     )
    
-
     save_scanned_files(records)
 
 

@@ -12,12 +12,7 @@ from langchain.chains import RetrievalQA
 from langchain.embeddings import HuggingFaceInstructEmbeddings
 from langchain.llms import HuggingFacePipeline, LlamaCpp
 from langchain.memory import ConversationBufferMemory
-from langchain.prompts import PromptTemplate, \
-    HumanMessagePromptTemplate, \
-    ChatPromptTemplate, PromptTemplate,\
-    SystemMessagePromptTemplate, \
-    AIMessagePromptTemplate, \
-    HumanMessagePromptTemplate
+from langchain.prompts import PromptTemplate
 
 # from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain.vectorstores import Chroma
@@ -223,19 +218,7 @@ def main(device_type, show_sources):
     Helpful Answer:"""
 
     prompt = PromptTemplate(input_variables=["history", "context", "question"], template=template)
-    #humanTemplate = "{text}";
-    #humanMessagePrompt = HumanMessagePromptTemplate.fromTemplate(humanTemplate);
-    #prompt = PromptTemplate(
-     #   template = "You are a helpful assistant that translates {input_language} to {output_language}.", \
-      #  input_variables= ["input_language", "output_language"]);
-    #systemMessagePrompt = SystemMessagePromptTemplate({prompt,});
-    #chatPrompt = ChatPromptTemplate.fromPromptMessages([
-     #   systemMessagePrompt,
-      #  humanMessagePrompt
-    #]);
-
     memory = ConversationBufferMemory(input_key="question", memory_key="history")
-
     llm = load_model(device_type, model_id=MODEL_ID, model_basename=MODEL_BASENAME)
 
     qa = RetrievalQA.from_chain_type(
@@ -268,7 +251,6 @@ def main(device_type, show_sources):
             print("----------------------------------SOURCE DOCUMENTS---------------------------")
             for document in docs:
                 print("\n> " + document.metadata["source"] ) # + ":")
-                #print(document.page_content)
             print("----------------------------------SOURCE DOCUMENTS---------------------------")
         add_conversation(timestamp, MODEL_ID,query)
         save_conversations()
@@ -282,7 +264,7 @@ def add_conversation(timestamp:str, model_id:str, query:str):
 def open_conversations():
     if(os.path.exists(CONVERSATION_HISTORY_FILE_NAME)):
         try:
-            with open(CONVERSATION_HISTORY_FILE_NAME,'r') as conversationFile:
+            with open(CONVERSATION_HISTORY_FILE_NAME,'r',encoding='utf-8') as conversationFile:
                 oldRecords = csv.DictReader(conversationFile, fieldnames=('timestamp','tuple'))
                 num = 0
                 for row in oldRecords:
@@ -300,7 +282,7 @@ def save_conversations():
         except Exception as ex:
             print(str(ex))
             
-    with open(CONVERSATION_HISTORY_FILE_NAME,'a+') as conversationFile:
+    with open(CONVERSATION_HISTORY_FILE_NAME,'a+',encoding='utf-8') as conversationFile:
         writer = csv.writer(conversationFile)
         writer.writerows(conversations.items())
 
