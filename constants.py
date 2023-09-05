@@ -40,7 +40,8 @@ MAX_IMAGE_FILES_PER_THREAD = 4
 
 # Define the Chroma settings
 CHROMA_SETTINGS = Settings(
-    chroma_db_impl="duckdb+parquet", persist_directory=PERSIST_DIRECTORY, anonymized_telemetry=False
+    anonymized_telemetry=False,
+    is_persistent=True,
 )
 
 # https://python.langchain.com/docs/modules/data_connection/document_loaders
@@ -82,13 +83,17 @@ CONVERSATION_HISTORY_FILE_NAME = "MyConversationHistory.csv"
 EMBEDDING_MODEL_NAME = "hkunlp/instructor-xl"
 
 
-# Select the Model ID and model_basename
-# load the LLM for generating Natural Language responses
+#### SELECT AN OPEN SOURCE LLM (LARGE LANGUAGE MODEL)
+    # Select the Model ID and model_basename
+    # load the LLM for generating Natural Language responses
 
 #MODEL_ID = "TheBloke/Llama-2-7B-Chat-GGML"
 #MODEL_BASENAME = "llama-2-7b-chat.ggmlv3.q4_0.bin"
 
-# for HF models
+####
+#### (FOR HF MODELS)
+####
+
 # MODEL_ID = "TheBloke/vicuna-7B-1.1-HF"
 # MODEL_BASENAME = None
 # MODEL_ID = "TheBloke/Wizard-Vicuna-7B-Uncensored-HF"
@@ -108,7 +113,6 @@ EMBEDDING_MODEL_NAME = "hkunlp/instructor-xl"
 #MODEL_ID = "TheBloke/WizardLM-7B-uncensored-GPTQ"
 #MODEL_BASENAME = "WizardLM-7B-uncensored-GPTQ-4bit-128g.compat.no-act-order.safetensors"
 
-# for GGML (quantized cpu+gpu+mps) models - check if they support llama.cpp
 # MODEL_ID = "TheBloke/wizard-vicuna-13B-GGML"
 # MODEL_BASENAME = "wizard-vicuna-13B.ggmlv3.q4_0.bin"
 # MODEL_BASENAME = "wizard-vicuna-13B.ggmlv3.q6_K.bin"

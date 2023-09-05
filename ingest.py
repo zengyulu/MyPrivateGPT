@@ -382,9 +382,46 @@ def main(device_type):
         embeddings,
         persist_directory=PERSIST_DIRECTORY,
         client_settings=CHROMA_SETTINGS,
+
     )
-    db.persist()
-    db = None
+   
+
+    save_scanned_files(records)
+
+
+def open_scanned_file():
+    if(os.path.exists(SCANNING_RECORD_CSV_FILE_NAME)):
+        try:
+            with open(SCANNING_RECORD_CSV_FILE_NAME,'r', encoding='utf-8') as dumpFile:
+                oldRecords = csv.DictReader(dumpFile, fieldnames=('hashcode','tuple'))
+                num = 0
+                unscanned = 0
+                for row in oldRecords:
+                    currentRecord = ast.literal_eval(row['tuple'])
+                    records[row['hashcode']] = {
+                        "original_path": currentRecord['original_path'],
+                        "file_name": currentRecord['file_name'],
+                        "timestamp": currentRecord['timestamp'],
+                        "is_image": currentRecord['is_image'],
+                        "scanned": currentRecord['scanned'],
+                    }
+                    if currentRecord['scanned'] == False:
+                        unscanned = unscanned+1
+                    num=num+1
+                logging.info(f"{num} records are loaded from {SCANNING_RECORD_CSV_FILE_NAME} and " + f"{unscanned} files are not scanned from last run.")    
+        except Exception as ex:
+            logging.error(f"While opening scan file from {SCANNING_RECORD_CSV_FILE_NAME}, following error occurred: " + str(ex))      
+
+def save_scanned_files(records:dict):
+    if os.path.exists(SCANNING_RECORD_CSV_FILE_NAME):
+        try:
+            os.remove(SCANNING_RECORD_CSV_FILE_NAME)
+        except Exception as ex:
+            logging.error(f"While saving scan file from {SCANNING_RECORD_CSV_FILE_NAME}, following error occurred: " + str(ex))
+            
+    with open(SCANNING_RECORD_CSV_FILE_NAME,'a+', encoding='utf-8') as dumpFile:
+        writer = csv.writer(dumpFile)
+        writer.writerows(records.items())
 
     save_scanned_files(records)
 
