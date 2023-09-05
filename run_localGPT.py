@@ -12,7 +12,12 @@ from langchain.chains import RetrievalQA
 from langchain.embeddings import HuggingFaceInstructEmbeddings
 from langchain.llms import HuggingFacePipeline, LlamaCpp
 from langchain.memory import ConversationBufferMemory
-from langchain.prompts import PromptTemplate
+from langchain.prompts import PromptTemplate, \
+    HumanMessagePromptTemplate, \
+    ChatPromptTemplate, PromptTemplate,\
+    SystemMessagePromptTemplate, \
+    AIMessagePromptTemplate, \
+    HumanMessagePromptTemplate
 
 # from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain.vectorstores import Chroma
@@ -77,7 +82,10 @@ def load_model(device_type, model_id, model_basename=None):
                 # Remove the ".safetensors" ending if present
                 model_basename = model_basename.replace(".safetensors", "")
 
-            tokenizer = AutoTokenizer.from_pretrained(model_id, use_fast=True,trust_remote_code=True)
+            tokenizer = AutoTokenizer.from_pretrained(model_id, \
+                                    use_fast=True,\
+                                    trust_remote_code=True)
+            
             logging.info("Tokenizer loaded")
 
             model = AutoGPTQForCausalLM.from_quantized(
@@ -215,6 +223,17 @@ def main(device_type, show_sources):
     Helpful Answer:"""
 
     prompt = PromptTemplate(input_variables=["history", "context", "question"], template=template)
+    #humanTemplate = "{text}";
+    #humanMessagePrompt = HumanMessagePromptTemplate.fromTemplate(humanTemplate);
+    #prompt = PromptTemplate(
+     #   template = "You are a helpful assistant that translates {input_language} to {output_language}.", \
+      #  input_variables= ["input_language", "output_language"]);
+    #systemMessagePrompt = SystemMessagePromptTemplate({prompt,});
+    #chatPrompt = ChatPromptTemplate.fromPromptMessages([
+     #   systemMessagePrompt,
+      #  humanMessagePrompt
+    #]);
+
     memory = ConversationBufferMemory(input_key="question", memory_key="history")
 
     llm = load_model(device_type, model_id=MODEL_ID, model_basename=MODEL_BASENAME)
